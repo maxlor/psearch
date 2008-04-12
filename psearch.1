@@ -1,0 +1,61 @@
+.TH PSEARCH "1" "January 2007" "psearch 2.0"
+.SH NAME
+psearch \- search the FreeBSD ports
+.SH SYNOPSIS
+\fBpsearch\fR [\fIoptions\fR] \fIPATTERN\fR [\fIPATTERN\fR \fI...\fR]
+.SH DESCRIPTION
+Searches ports for \fIPATTERN\fR. \fIPATTERN\fR is a case\-insensitive regular expression).
+If there is more than one \fIPATTERN\fR, each of them is searched for. By default,
+ports are shown that match all patterns.
+.PP
+By default, the name and the short description are
+searched. If you specify the \fB\-s\fR option, then the long description is searched
+as well. Since this will slow down searching substantially, it is recommended that
+the \fB\-c\fR option is also used to reduce the number of pkg-descr files that need
+to be searched.
+.PP
+\fBpsearch\fR uses IEEE Std 1003.2 (``POSIX.2'') regular expressions as explained by 
+.BR re_format (7) .
+.SH OPTIONS
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Show program's version number and exit.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Show a brief help message explaining the options and exit
+.TP
+\fB\-c\fR \fICATEGORY\fR, \fB\-\-category\fR=\fICATEGORY\fR
+Only search for ports in \fICATEGORY\fR. Speeds up searching,
+especially when \fB\-\-search_long\fR is also specified
+.TP
+\fB\-f\fR \fIFILE\fR, \fB\-\-file\fR=\fIFILE\fR
+Path to INDEX file. The default is the default location of the INDEX file
+on the FreeBSD system that \fBpsearch\fR runs on. Non-standard locations
+that are specified in /etc/make.conf are ignored.
+.TP
+\fB\-l\fR, \fB\-\-long\fR
+Display long description (pkg\-descr file) for any match found. Does
+not automatically search the long description.
+.TP
+\fB\-n\fR, \fB\-\-name\fR
+Print canonical name of a port, including its version.
+.TP
+\fB\-o\fR, \fB\-\-or\fR
+Search for ports that match any \fIPATTERN\fR, instead of all of them.
+in other words, OR the \fIPATTERN\fRs, instead of ANDing them.
+.TP
+\fB\-s\fR, \fB\-\-search_long\fR
+Search long descriptions (pkg\-descr file), which slows down
+searching. Does not automatically display the long description.
+.TP
+\fB\-v\fR \fIINVERSE_PATTERN\fR, \fB\-\-inverse\fR=\fIINVERSE_PATTERN\fR
+Searches for ports that do not match \fIINVERSE_PATTERN\fR. May be
+specified several times.
+.SH SEE ALSO
+.BR re_format (7)
+.SH BUGS
+Any relevant values stored in environment variables or /etc/make.conf are ignored.
+This means that if your INDEX file does not reside in /usr/ports, you'll need to use
+the \fB-f\fR option when running \fBpsearch\fR.
+.SH AUTHOR
+Benjamin Lutz (http://public.xdi.org/=Benjamin.Lutz)
