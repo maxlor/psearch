@@ -37,6 +37,12 @@ that are specified in /etc/make.conf are ignored.
 Display long description (pkg\-descr file) for any match found. Does
 not automatically search the long description.
 .TP
+\fB\-m\fR, \fB\-\-maintainer\fR
+Display the maintainer's email address instead of the short description
+for any match found, and switch on searching the maintainer's email address.
+Specifying this parameter and searching for \fBports@freebsd.org\fR displays
+all unmaintained ports.
+.TP
 \fB\-n\fR, \fB\-\-name\fR
 Print canonical name of a port, including its version.
 .TP

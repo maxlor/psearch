@@ -29,14 +29,15 @@ bool disjoint(const set<string>& a, const set<string>& b);
 void set_default_index_filename(string &index_filename);
 
 const string PROGNAME("psearch");
-const string VERSION("2.0rc2");
-const string COPYRIGHT("Copyright (C) 2006-2007");
+const string VERSION("2.0rc3");
+const string COPYRIGHT("Copyright (C) 2006-2008");
 const string AUTHOR("Benjamin Lutz (http://public.xdi.org/=Benjamin.Lutz)");
 
 string index_filename("");
 
 int main(int argc, char** argv) {
 	bool flag_long = false;
+	bool flag_maintainer = false;
 	bool flag_name = false;
 	bool flag_or = false;
 	bool flag_search_long = false;
@@ -57,6 +58,7 @@ int main(int argc, char** argv) {
 		{ "category",    required_argument, NULL, 'c' },
 		{ "file",        required_argument, NULL, 'f' },
 		{ "long",        no_argument,       NULL, 'l' },
+		{ "maintainer",  no_argument,       NULL, 'm' },
 		{ "name",        no_argument,       NULL, 'n' },
 		{ "or",          no_argument,       NULL, 'o' },
 		{ "search_long", no_argument,       NULL, 's' },
@@ -64,7 +66,7 @@ int main(int argc, char** argv) {
 		{ NULL,          no_argument,       NULL, 0 }
 	};
 	
-	while (int ch = getopt_long(argc, argv, "Vhc:f:lnosv:", longopts, NULL)) {
+	while (int ch = getopt_long(argc, argv, "Vhc:f:lmnosv:", longopts, NULL)) {
 		if (-1 == ch) { break; }
 		switch (ch) {
 			case 'V': print_copyright(); return 0;
@@ -72,6 +74,7 @@ int main(int argc, char** argv) {
 			case 'c': categories.insert(string(optarg)); break;
 			case 'f': index_filename = optarg; break;
 			case 'l': flag_long = true; break;
+			case 'm': flag_maintainer = true; break;
 			case 'n': flag_name = true; break;
 			case 'o': flag_or = true; break;
 			case 's': flag_search_long = true; break;
@@ -91,7 +94,7 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	
-	Index index(index_filename, flag_long | flag_search_long, not categories.empty());
+	Index index(index_filename, flag_long | flag_search_long, flag_maintainer, not categories.empty());
 	if (not index.readable()) {
 		cerr << "Error: cannot read index file \"" << index_filename << "\"." << endl;
 		return 1;
@@ -112,6 +115,9 @@ int main(int argc, char** argv) {
 			for (inverse_patterns.first(); not inverse_patterns.last(); inverse_patterns.next() ) {
 				inv_match = (inverse_patterns.match(index.pkgname()) or
 						inverse_patterns.match(index.desc()));
+				if (not inv_match and flag_maintainer) {
+					inv_match = inverse_patterns.match(index.maintainer());
+				}
 				if (not inv_match and flag_search_long) {
 					inv_match = inverse_patterns.match_file(index.descpath());
 				}
@@ -121,16 +127,19 @@ int main(int argc, char** argv) {
 			if (inv_match) { continue; }
 		}
 		
-		bool pattern_match = !flag_or;
+		bool all_pattern_match = !flag_or;
 		for (patterns.first(); not patterns.last(); patterns.next() ) {
 			bool match = (patterns.match(index.pkgname()) or patterns.match(index.desc()));
+			if (not match and flag_maintainer) {
+				match = patterns.match(index.maintainer());
+			}
 			if (not match and flag_search_long) {
 				match = patterns.match_file(index.descpath());
 			}
-			pattern_match = (flag_or ? (pattern_match | match) : (pattern_match & match));
+			all_pattern_match = (flag_or ? (all_pattern_match | match) : (all_pattern_match & match));
 		}
 		
-		if (pattern_match) { index.print_line(flag_name, flag_long); }
+		if (all_pattern_match) { index.print_line(flag_name, flag_maintainer, flag_long); }
 	}
 	
 	return 0;
@@ -159,6 +168,8 @@ endl <<
 "                       Only search for ports in CATEGORY. Speeds up searching." << endl <<
 "  -f FILE, --file=FILE Path to INDEX file. Default: \"" << index_filename << "\"" << endl <<
 "  -l, --long           Display long description (pkg-descr file) for any match." << endl <<
+"  -m, --maintainer     Display maintainer instead of the short description," << endl <<
+"                       and also search the maintainer field." << endl <<
 "  -n, --name           Print canonical name of a port, including its version." << endl <<
 "  -o, --or             Search for ports that match any PATTERN." << endl <<
 "  -s, --search_long    Search long descriptions (pkg-descr file). Slows down" << endl <<

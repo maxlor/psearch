@@ -20,13 +20,17 @@ public:
 	 * through parse_line() calls later.
 	 * 
 	 * @param filename file to be opened as index file.
-	 * @param need_descpath Whether the path to the description file needs to
-	 *                      be parsed from the index file later.
-	 * @param need_categories Whether the categories field needs to parsed
-	 *                        from the index file later. Implies
+	 * @param need_descpath Whether the path to the description file needs
+	 *                      to be parsed from the index file later.
+	 * @param need_maintainer Whether the maintainer field needs to be
+	 *                        parsed from the index file later. Implies
 	 *                        need_descpath.
+	 * @param need_categories Whether the categories field needs to be
+	 *                        parsed from the index file later. Implies
+	 *                        need_maintainer and need_descpath.
 	 */
-	Index(const string filename, bool need_descpath, bool need_categories);
+	Index(const string filename, bool need_descpath, bool need_maintainer,
+			bool need_categories);
 	~Index();
 	
 	/**
@@ -86,16 +90,19 @@ public:
 	 * Prints the entry for the currently parsed line.
 	 * 
 	 * @param flag_name If true, print package name instead of path.
+	 * @param flag_maintainer If true, print the maintainer's email
+	 *                        address instead of the package description.
 	 * @param flag_long If true, print pkg-descr file too.
 	 */
-	void print_line(bool flag_name, bool flag_long);
+	void print_line(bool flag_name, bool flag_maintainer, bool flag_long);
 
 private:
 	ifstream file;
 	string line;
 	bool need_descpath;
+	bool need_maintainer;
 	bool need_categories;
-	unsigned int fields_len;
+	unsigned int fields_num;
 	string fields[7];
 	set<string> _categories;
 };
