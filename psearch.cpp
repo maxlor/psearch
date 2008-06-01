@@ -29,7 +29,7 @@ bool disjoint(const set<string>& a, const set<string>& b);
 void set_default_index_filename(string &index_filename);
 
 const string PROGNAME("psearch");
-const string VERSION("2.0rc3");
+const string VERSION("2.0");
 const string COPYRIGHT("Copyright (C) 2006-2008");
 const string AUTHOR("Benjamin Lutz (http://public.xdi.org/=Benjamin.Lutz)");
 
