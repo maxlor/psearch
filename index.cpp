@@ -42,6 +42,8 @@ bool Index::parse_line() {
 	
 	fields[Path] = fields[Path].substr(11); // strip leading '/usr/ports/'
 	if (need_categories) { _categories.clear(); }
+
+	return true;
 }
 
 
