@@ -1,11 +1,10 @@
-#include <assert.h>
-#include <errno.h>
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <regex.h>
 #include <set>
-#include <stdlib.h>
 #include <string>
-#include <limits.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
@@ -29,8 +28,8 @@ bool disjoint(const set<string>& a, const set<string>& b);
 void set_default_index_filename(string &index_filename);
 
 const string PROGNAME("psearch");
-const string VERSION("2.0");
-const string COPYRIGHT("Copyright (C) 2006-2008");
+const string VERSION("2.0.2");
+const string COPYRIGHT("Copyright 2006-2012");
 const string AUTHOR("Benjamin Lutz (http://public.xdi.org/=Benjamin.Lutz)");
 
 string index_filename("");
