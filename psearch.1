@@ -4,15 +4,18 @@ psearch \- search the FreeBSD ports
 .SH SYNOPSIS
 \fBpsearch\fR [\fIoptions\fR] \fIPATTERN\fR [\fIPATTERN\fR \fI...\fR]
 .SH DESCRIPTION
-Searches ports for \fIPATTERN\fR. \fIPATTERN\fR is a case\-insensitive regular expression).
-If there is more than one \fIPATTERN\fR, each of them is searched for. By default,
-ports are shown that match all patterns.
+Lists ports whose description matches \fIPATTERN\fR. \fIPATTERN\fR is a
+case-insensitive regular expression.
 .PP
-By default, the name and the short description are
-searched. If you specify the \fB\-s\fR option, then the long description is searched
-as well. Since this will slow down searching substantially, it is recommended that
-the \fB\-c\fR option is also used to reduce the number of pkg-descr files that need
-to be searched.
+If more than one pattern is given, a port description has to match all of them
+for the port to be listed. If \fB\-o\fR is given, a single pattern match
+suffices instead.
+.PP
+By default, the name and the short description are searched. If \fB\-s\fR is
+given, the long description is searched as well, which slows things down a
+lot. This can be compensated for by limiting searches to a port category with
+\fB\-c\fR, thus reducing the number of pkg-plist files that need to be
+searched.
 .PP
 \fBpsearch\fR uses IEEE Std 1003.2 (``POSIX.2'') regular expressions as explained by 
 .BR re_format (7) .
@@ -22,20 +25,20 @@ to be searched.
 Show program's version number and exit.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-Show a brief help message explaining the options and exit
+Show a brief help message explaining the options and exit.
 .TP
 \fB\-c\fR \fICATEGORY\fR, \fB\-\-category\fR=\fICATEGORY\fR
 Only search for ports in \fICATEGORY\fR. Speeds up searching,
-especially when \fB\-\-search_long\fR is also specified
+especially when \fB\-\-search_long\fR is also specified.
 .TP
 \fB\-f\fR \fIFILE\fR, \fB\-\-file\fR=\fIFILE\fR
-Path to INDEX file. The default is the default location of the INDEX file
+Path to INDEX file. Defaults to the standard location of the INDEX file
 on the FreeBSD system that \fBpsearch\fR runs on. Non-standard locations
-that are specified in /etc/make.conf are ignored.
+given in /etc/make.conf are ignored.
 .TP
 \fB\-l\fR, \fB\-\-long\fR
-Display long description (pkg\-descr file) for any match found. Does
-not automatically search the long description.
+Display the long description (pkg\-descr file) for any match found. They are
+not searched however, unless \fB\-\-search_long\fR is also given.
 .TP
 \fB\-m\fR, \fB\-\-maintainer\fR
 Display the maintainer's email address instead of the short description
@@ -47,12 +50,13 @@ all unmaintained ports.
 Print canonical name of a port, including its version.
 .TP
 \fB\-o\fR, \fB\-\-or\fR
-Search for ports that match any \fIPATTERN\fR, instead of all of them.
-in other words, OR the \fIPATTERN\fRs, instead of ANDing them.
+List ports whose description match any \fIPATTERN\fR, instead of requiring it
+to match all of them.
 .TP
 \fB\-s\fR, \fB\-\-search_long\fR
 Search long descriptions (pkg\-descr file), which slows down
-searching. Does not automatically display the long description.
+searching. The long descriptions are not displayed however, unless
+\fB\-\-long\fR is also given.
 .TP
 \fB\-v\fR \fIINVERSE_PATTERN\fR, \fB\-\-inverse\fR=\fIINVERSE_PATTERN\fR
 Searches for ports that do not match \fIINVERSE_PATTERN\fR. May be

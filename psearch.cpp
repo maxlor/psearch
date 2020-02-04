@@ -2,25 +2,31 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <regex.h>
+#include <regex>
 #include <set>
 #include <string>
+#include <vector>
+extern "C" {
 #include <sys/types.h>
+#ifdef __FreeBSD__
 #include <sys/sysctl.h>
+#include <getopt.h>
+#endif
+}
 
-#include "getopt.h"
 #include "index.h"
-#include "regexlist.h"
 
 using namespace std;
 
-
 void print_copyright();
-void print_help(char* progname);
+void print_help(char* progname, const string &index_filename);
 /**
  * Compares sets a and b to see whether they are disjoint.
  */
 bool disjoint(const set<string>& a, const set<string>& b);
+
+bool regex_search_file(const string &path, const regex &r);
+
 /**
  * Finds the default index filename depending on the OS version
  * we're running on.
@@ -28,11 +34,11 @@ bool disjoint(const set<string>& a, const set<string>& b);
 void set_default_index_filename(string &index_filename);
 
 const string PROGNAME("psearch");
-const string VERSION("2.0.2");
-const string COPYRIGHT("Copyright 2006-2012");
-const string AUTHOR("Benjamin Lutz (http://public.xdi.org/=Benjamin.Lutz)");
+const string VERSION("2.1.0");
+const string COPYRIGHT("Copyright 2008, 2012, 2020");
+const string AUTHOR("Benjamin Lutz (mail");
+const string AUTHOR2("maxlor.com)");
 
-string index_filename("");
 
 int main(int argc, char** argv) {
 	bool flag_long = false;
@@ -40,14 +46,16 @@ int main(int argc, char** argv) {
 	bool flag_name = false;
 	bool flag_or = false;
 	bool flag_search_long = false;
+	string index_filename;
 	set<string> categories;
-	Regexlist patterns;
-	Regexlist inverse_patterns;
+	vector<regex> patterns;
+	vector<regex> inverse_patterns;
+	const regex::flag_type regex_flags = regex::extended | regex::icase | regex::nosubs | regex::optimize;
 	
 	set_default_index_filename(index_filename);
 
 	if (argc == 1) {
-		print_help(argv[0]);
+		print_help(argv[0], index_filename);
 		return 0;
 	}
 	
@@ -69,7 +77,7 @@ int main(int argc, char** argv) {
 		if (-1 == ch) { break; }
 		switch (ch) {
 			case 'V': print_copyright(); return 0;
-			case 'h': print_help(argv[0]); return 0;
+			case 'h': print_help(argv[0], index_filename); return 0;
 			case 'c': categories.insert(string(optarg)); break;
 			case 'f': index_filename = optarg; break;
 			case 'l': flag_long = true; break;
@@ -77,14 +85,14 @@ int main(int argc, char** argv) {
 			case 'n': flag_name = true; break;
 			case 'o': flag_or = true; break;
 			case 's': flag_search_long = true; break;
-			case 'v': inverse_patterns.append(optarg); break;
+			case 'v': inverse_patterns.push_back(regex(optarg, regex_flags)); break;
 			case '?':
-			default: print_help(argv[0]); return 1;
+			default: print_help(argv[0], index_filename); return 1;
 		}
 	}
 	
 	for (int i = optind; i < argc; ++i) {
-		patterns.append(argv[i]);
+		patterns.push_back(regex(argv[i], regex_flags));
 	}
 	
 	if (index_filename.empty()) {
@@ -93,52 +101,58 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	
-	Index index(index_filename, flag_long | flag_search_long, flag_maintainer, not categories.empty());
+	Index index(index_filename, !flag_name, flag_long | flag_search_long, flag_maintainer,
+				not categories.empty());
 	if (not index.readable()) {
-		cerr << "Error: cannot read index file \"" << index_filename << "\"." << endl;
+		cerr << "Error reading index file \"" << index_filename << "\": "
+			<< strerror(errno) << endl;
 		return 1;
 	}
 	
 	// finished with initalization
 	
 	// Now, read each line from the index file and maybe match it
-	while (index.read_line() and index.parse_line()) {
+	while (index.read_line()) {
+		if (not index.parse_line()) { continue; }
 		// Filter by categories, if the user specified it.
 		if (not categories.empty()) {
 			if (disjoint(categories, index.categories())) { continue; }
 		}
 		
 		// Filter by inverse patterns, if the user specified it
-		if (not inverse_patterns.empty()) {
-			bool inv_match = false;
-			for (inverse_patterns.first(); not inverse_patterns.last(); inverse_patterns.next() ) {
-				inv_match = (inverse_patterns.match(index.pkgname()) or
-						inverse_patterns.match(index.desc()));
-				if (not inv_match and flag_maintainer) {
-					inv_match = inverse_patterns.match(index.maintainer());
-				}
-				if (not inv_match and flag_search_long) {
-					inv_match = inverse_patterns.match_file(index.descpath());
-				}
-				if (inv_match) { break; }
-			}
+		bool inv_match = false;
+		for (const regex &r : inverse_patterns) {
+			inv_match = regex_search(index.pkgname(), r)
+				or regex_search(index.origin(), r)
+				or regex_search(index.desc(), r)
+				or (flag_maintainer and regex_search(index.maintainer(), r))
+				or (flag_search_long and regex_search_file(index.descpath(), r));
+			if (inv_match) { break; }
+		}		
+		if (inv_match) { continue; }
+		
+		// Filter by patterns
+		bool match_one = false;
+		bool match_all = true;
+		for (const regex &r : patterns) {
+			bool match = regex_search(index.pkgname(), r) 
+					or regex_search(index.origin(), r)
+					or regex_search(index.desc(), r)
+					or (flag_maintainer and regex_search(index.maintainer(), r))
+					or (flag_search_long and regex_search_file(index.descpath(), r));
+			match_one |= match;
+			match_all &= match;
 			
-			if (inv_match) { continue; }
+			if (flag_or) {
+				if (match_one) { break; }
+			} else if (not match_all) {
+				break;
+			}
 		}
 		
-		bool all_pattern_match = !flag_or;
-		for (patterns.first(); not patterns.last(); patterns.next() ) {
-			bool match = (patterns.match(index.pkgname()) or patterns.match(index.desc()));
-			if (not match and flag_maintainer) {
-				match = patterns.match(index.maintainer());
-			}
-			if (not match and flag_search_long) {
-				match = patterns.match_file(index.descpath());
-			}
-			all_pattern_match = (flag_or ? (all_pattern_match | match) : (all_pattern_match & match));
+		if (match_all or (flag_or and match_one)) {
+			index.print_line(flag_name, flag_maintainer, flag_long);
 		}
-		
-		if (all_pattern_match) { index.print_line(flag_name, flag_maintainer, flag_long); }
 	}
 	
 	return 0;
@@ -147,35 +161,29 @@ int main(int argc, char** argv) {
 
 void print_copyright() {
 	cout << PROGNAME << ' ' << VERSION << endl;
-	cout << COPYRIGHT << ' ' << AUTHOR << endl;
+	cout << COPYRIGHT << ' ' << AUTHOR << '@' << AUTHOR2 << endl;
 }
 
 
-void print_help(char* prog_name) {
-	cout << "usage: " << prog_name << " [options] PATTERN [PATTERN ...]" << endl;
-	cout << endl <<
-"Searches ports for PATTERN. PATTERN is a case-insensitive regular expression." << endl <<
-"if there is more than one pattern, each of them is searched for. By default," << endl <<
-"ports are shown that match all patterns, use -o to show ports that match at" << endl <<
-"least one pattern. By default, the name and the short description are searched." << endl <<
-"If you specify the -s option, then the long description is searched as well." << endl <<
-endl <<
-"options:" << endl <<
-"  -V, --version        Show program's version number and exit." << endl <<
-"  -h, --help           Show this help message and exit." << endl <<
-"  -c CATEGORY, --category=CATEGORY" << endl <<
-"                       Only search for ports in CATEGORY. Speeds up searching." << endl <<
-"  -f FILE, --file=FILE Path to INDEX file. Default: \"" << index_filename << "\"" << endl <<
-"  -l, --long           Display long description (pkg-descr file) for any match." << endl <<
-"  -m, --maintainer     Display maintainer instead of the short description," << endl <<
-"                       and also search the maintainer field." << endl <<
-"  -n, --name           Print canonical name of a port, including its version." << endl <<
-"  -o, --or             Search for ports that match any PATTERN." << endl <<
-"  -s, --search_long    Search long descriptions (pkg-descr file). Slows down" << endl <<
-"                       searching." << endl <<
-"  -v INVERSE_PATTERN, --inverse=INVERSE_PATTERN" << endl <<
-"                       Searches for ports that do not match a pattern. May be" << endl <<
-"                       specified several times." << endl;
+void print_help(char* prog_name, const string &index_filename) {
+	cout << "Usage: " << prog_name << R"( [options] PATTERN [PATTERN ...]
+
+Lists ports whose description matches PATTERN. 
+
+Options:
+  -V, --version        Show program's version number and exit.
+  -h, --help           Show this help message and exit.
+  -c CATEGORY, --category=CATEGORY
+                       Only search for ports in CATEGORY.
+  -f FILE, --file=FILE Path to INDEX file. Default: ")" << index_filename << R"(".
+  -l, --long           Display long description (pkg-descr file) for any match.
+  -m, --maintainer     Search and display the maintainer.
+  -n, --name           Print canonical name of a port, including its version.
+  -o, --or             Search for ports that match any PATTERN.
+  -s, --search_long    Search long descriptions (pkg-descr file). Slow.
+  -v INVERSE_PATTERN, --inverse=INVERSE_PATTERN
+                       Searches for ports that do not match a pattern.
+)";
 }
 
 
@@ -190,7 +198,20 @@ bool disjoint(const set<string>& a, const set<string>& b) {
 }
 
 
+bool regex_search_file(const string &path, const regex &r) {
+	string line;
+	
+	ifstream file(path);
+	while (file.good()) {
+		getline(file, line);
+		if (regex_search(line, r)) { return true; }
+	}
+	return false;	
+}
+
+
 void set_default_index_filename(string &index_filename) {
+#if defined(__FreeBSD__)
 	// get kern.ostype sysctl to see whether we're running
 	// on FreeBSD. If we're not, don't set a standard index
 	// file path
@@ -199,11 +220,11 @@ void set_default_index_filename(string &index_filename) {
 	size_t len = sizeof(ostype);
 	
 	int retval = sysctl(mib, 2, ostype, &len, NULL, 0);
-	ostype[len - 1] = '\0';
 	if (retval != 0 && errno != ENOMEM) {
 		perror("sysctl");
-		exit(1);
+		return;
 	}
+	ostype[len - 1] = '\0';
 	
 	if (0 != strncmp("FreeBSD", ostype, len)) { return; }
 	
@@ -213,24 +234,23 @@ void set_default_index_filename(string &index_filename) {
 	char osrelease[32];
 	len = sizeof(osrelease);
 	retval = sysctl(mib, 2, osrelease, &len, NULL, 0);
-	osrelease[len - 1] = '\0';
 	if (retval != 0 && errno != ENOMEM) {
 		perror("sysctl");
-		exit(1);
+		return;
 	}
+	osrelease[len - 1] = '\0';
 	
 	// get major version
 	char* s = strchr(osrelease, '.');
 	if (s == NULL) { return; }
 	size_t major_version_str_len = (size_t)(s - osrelease) + 1;
+	if (major_version_str_len < 1 or major_version_str_len > 3) { return; }
 	char major_version_str[major_version_str_len];
 	strlcpy(major_version_str, osrelease, major_version_str_len);
-	long major_version = strtol(major_version_str, NULL, 10);
-	if (major_version == 0) { return; }
 	
-	index_filename = "/usr/ports/INDEX";
-	if (major_version >= 5) {
-		index_filename.append("-");
-		index_filename.append(major_version_str);
-	}
+	index_filename = "/usr/ports/INDEX-";
+	index_filename.append(major_version_str);
+#else
+	index_filename.clear();
+#endif
 }

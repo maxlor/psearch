@@ -6,13 +6,10 @@
 #include <string>
 
 
-using namespace std;
-
-
 class Index {
 public:
 	enum Fieldname {
-		Pkgname = 0, Path, Prefix, Desc, Descpath, Maintainer, Categories
+		Pkgname = 0, Origin, Prefix, Desc, Descpath, Maintainer, Categories
 	}; 
 	
 	/**
@@ -20,6 +17,8 @@ public:
 	 * through parse_line() calls later.
 	 * 
 	 * @param filename file to be opened as index file.
+	 * @param unique_origin If true, a row which has the same origin as
+	 *                      a previous row will be skipped.
 	 * @param need_descpath Whether the path to the description file needs
 	 *                      to be parsed from the index file later.
 	 * @param need_maintainer Whether the maintainer field needs to be
@@ -29,8 +28,8 @@ public:
 	 *                        parsed from the index file later. Implies
 	 *                        need_maintainer and need_descpath.
 	 */
-	Index(const string filename, bool need_descpath, bool need_maintainer,
-			bool need_categories);
+	Index(const std::string filename, bool unique_origin,
+		  bool need_descpath, bool need_maintainer, bool need_categories);
 	~Index();
 	
 	/**
@@ -53,38 +52,25 @@ public:
 	 */
 	bool parse_line();
 	
-	/**
-	 * Specifies whether the path to the pkg-descr files are being read from
-	 * the INDEX file. This is controlled with the corresponding constructor
-	 * argument.
-	 */
-	bool descpath_available() const;
-	
-	/**
-	 * Specifies whether the categories were being read from the INDEX file
-	 * This is controlled with the corresponding constructor argument.
-	 */
-	bool categories_available() const;
-	
 	///@{
 	/**
-	 * Return a fieldname. The fields Maintainer() and Categories() are only
-	 * available if need_categories was true in the constructor. Descpath()
+	 * Return a fieldname. The fields maintainer() and categories() are only
+	 * available if need_categories was true in the constructor. descpath()
 	 * is only available if need_descpath or need_categories were true in the
 	 * constructor.
 	 */
-	string pkgname() const;
-	string path() const;
-	string prefix() const;
-	string desc() const;
-	string descpath() const;
-	string maintainer() const;
+	std::string pkgname() const;
+	std::string origin() const;
+	std::string prefix() const;
+	std::string desc() const;
+	std::string descpath() const;
+	std::string maintainer() const;
 	///@}
 	
 	/**
 	 * Categories this entry belongs to.
 	 */
-	set<string> categories();
+	std::set<std::string> categories();
 	
 	/**
 	 * Prints the entry for the currently parsed line.
@@ -97,30 +83,20 @@ public:
 	void print_line(bool flag_name, bool flag_maintainer, bool flag_long);
 
 private:
-	ifstream file;
-	string line;
-	bool need_descpath;
-	bool need_maintainer;
-	bool need_categories;
-	unsigned int fields_num;
-	string fields[7];
-	set<string> _categories;
+	std::ifstream _file;
+	std::string _line;
+	bool _unique_origin;
+	unsigned int _fields_num;
+	std::string _fields[7];
+	std::set<std::string> _origins;
 };
 
 
-inline bool Index::read_line() {
-	getline(file, line);
-	return file.good();
-}
-
-
-inline bool Index::descpath_available() const { return need_descpath; }
-inline bool Index::categories_available() const { return need_categories; }
-inline string Index::pkgname()    const { return fields[Pkgname]; }
-inline string Index::path()       const { return fields[Path]; }
-inline string Index::prefix()     const { return fields[Prefix]; }
-inline string Index::desc()       const { return fields[Desc]; }
-inline string Index::descpath()   const { return fields[Descpath]; }
-inline string Index::maintainer() const { return fields[Maintainer]; }
+inline std::string Index::pkgname()    const { return _fields[Pkgname]; }
+inline std::string Index::origin()     const { return _fields[Origin]; }
+inline std::string Index::prefix()     const { return _fields[Prefix]; }
+inline std::string Index::desc()       const { return _fields[Desc]; }
+inline std::string Index::descpath()   const { return _fields[Descpath]; }
+inline std::string Index::maintainer() const { return _fields[Maintainer]; }
 
 #endif
