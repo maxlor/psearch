@@ -1,8 +1,9 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <getopt.h>
 #include <iostream>
-#include <regex>
+#include <regex.h>
 #include <set>
 #include <string>
 #include <vector>
@@ -10,7 +11,6 @@ extern "C" {
 #include <sys/types.h>
 #ifdef __FreeBSD__
 #include <sys/sysctl.h>
-#include <getopt.h>
 #endif
 }
 
@@ -20,12 +20,14 @@ using namespace std;
 
 void print_copyright();
 void print_help(char* progname, const string &index_filename);
-/**
- * Compares sets a and b to see whether they are disjoint.
- */
+
+bool add_pattern(vector<regex_t> &patterns, const char *pattern);
+
+/** Compares sets a and b to see whether they are disjoint. */
 bool disjoint(const set<string>& a, const set<string>& b);
 
-bool regex_search_file(const string &path, const regex &r);
+bool regex_search(const string &s, const regex_t &r);
+bool regex_search_file(const string &path, const regex_t &r);
 
 /**
  * Finds the default index filename depending on the OS version
@@ -48,9 +50,8 @@ int main(int argc, char** argv) {
 	bool flag_search_long = false;
 	string index_filename;
 	set<string> categories;
-	vector<regex> patterns;
-	vector<regex> inverse_patterns;
-	const regex::flag_type regex_flags = regex::extended | regex::icase | regex::nosubs | regex::optimize;
+	vector<regex_t> patterns;
+	vector<regex_t> inverse_patterns;
 	
 	set_default_index_filename(index_filename);
 
@@ -85,20 +86,20 @@ int main(int argc, char** argv) {
 			case 'n': flag_name = true; break;
 			case 'o': flag_or = true; break;
 			case 's': flag_search_long = true; break;
-			case 'v': inverse_patterns.push_back(regex(optarg, regex_flags)); break;
+			case 'v': if (not add_pattern(inverse_patterns, optarg)) { return 1; }; break;
 			case '?':
 			default: print_help(argv[0], index_filename); return 1;
 		}
-	}
-	
-	for (int i = optind; i < argc; ++i) {
-		patterns.push_back(regex(argv[i], regex_flags));
 	}
 	
 	if (index_filename.empty()) {
 		cerr << "Error: cannot determine the default path of the index file. Please specify" << endl;
 		cerr << "the path to the index file manually using the -f option." << endl;
 		return 1;
+	}
+	
+	for (int i = optind; i < argc; ++i) {
+		if (not add_pattern(patterns, argv[i])) { return 1; }
 	}
 	
 	Index index(index_filename, !flag_name, flag_long | flag_search_long, flag_maintainer,
@@ -121,7 +122,7 @@ int main(int argc, char** argv) {
 		
 		// Filter by inverse patterns, if the user specified it
 		bool inv_match = false;
-		for (const regex &r : inverse_patterns) {
+		for (const regex_t &r : inverse_patterns) {
 			inv_match = regex_search(index.pkgname(), r)
 				or regex_search(index.origin(), r)
 				or regex_search(index.desc(), r)
@@ -134,7 +135,7 @@ int main(int argc, char** argv) {
 		// Filter by patterns
 		bool match_one = false;
 		bool match_all = true;
-		for (const regex &r : patterns) {
+		for (const regex_t &r : patterns) {
 			bool match = regex_search(index.pkgname(), r) 
 					or regex_search(index.origin(), r)
 					or regex_search(index.desc(), r)
@@ -187,6 +188,22 @@ Options:
 }
 
 
+bool add_pattern(vector<regex_t> &patterns, const char *pattern) {
+	constexpr int regex_flags = REG_EXTENDED | REG_ICASE | REG_NOSUB;
+	regex_t regex;
+	int retval = regcomp(&regex, pattern, regex_flags);
+	if (retval) {
+		char buffer[256];
+		regerror(retval, &regex, buffer, sizeof(buffer));
+		cerr << "Error in pattern: " << buffer << endl;
+		return false;
+	} else {
+		patterns.push_back(regex);
+		return true;
+	}
+}
+
+
 bool disjoint(const set<string>& a, const set<string>& b) {
 	set<string>::const_iterator it_a, it_b;
 	for (it_a = a.begin(); it_a != a.end(); ++it_a) {
@@ -198,7 +215,12 @@ bool disjoint(const set<string>& a, const set<string>& b) {
 }
 
 
-bool regex_search_file(const string &path, const regex &r) {
+bool regex_search(const string &s, const regex_t &r) {
+	return regexec(&r, s.c_str(), 0, NULL, 0) != REG_NOMATCH;
+}
+
+
+bool regex_search_file(const string &path, const regex_t &r) {
 	string line;
 	
 	ifstream file(path);
